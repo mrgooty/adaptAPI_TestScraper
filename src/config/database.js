@@ -14,7 +14,21 @@ const options = {
 };
 
 if (envConfig.use_env_variable) {
-  options.url = process.env[envConfig.use_env_variable];
+  const rawUrl = process.env[envConfig.use_env_variable];
+  if (rawUrl) {
+    // Hosted Postgres providers (Neon, Supabase, Heroku) append pg-specific
+    // params like `?sslmode=require&channel_binding=require` to their
+    // connection strings, but Sequelize v7 rejects URL params it doesn't
+    // know. Strip them and translate sslmode into the dialect's ssl option.
+    const url = new URL(rawUrl);
+    const sslmode = url.searchParams.get('sslmode');
+    url.searchParams.delete('sslmode');
+    url.searchParams.delete('channel_binding');
+    options.url = url.toString();
+    if (sslmode && sslmode !== 'disable') {
+      options.ssl = { require: true, rejectUnauthorized: false };
+    }
+  }
 } else {
   options.host = envConfig.host;
   options.port = envConfig.port;
