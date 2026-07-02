@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Carrier Data Dashboard</title>
+<!-- Served locally from public/vendor — no CDN dependency, works offline. -->
+<script src="/vendor/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --card: #ffffff;
+    --text: #1a1a19;
+    --muted: #6b6b68;
+    --border: #e6e5e0;
+    --accent: #c2542f;
+    --accent-soft: #f3ddd3;
+    --green: #2f7a4f;
+    --amber: #b6842a;
+    --red: #b3392c;
+    --blue: #35638a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--card);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .header-actions { display: flex; gap: 8px; }
+  #refreshBtn, #scrapeBtn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  #scrapeBtn { background: var(--blue); }
+  #refreshBtn:hover, #scrapeBtn:hover { opacity: 0.9; }
+  #refreshBtn:disabled, #scrapeBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+  main { padding: 24px 32px 60px; max-width: 1400px; margin: 0 auto; }
+
+  #errorState, #loadingState {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--muted);
+  }
+  #errorState code {
+    background: var(--accent-soft);
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: var(--accent);
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .stat-value { font-size: 26px; font-weight: 700; }
+  .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .chart-card h3 { margin: 0 0 12px; font-size: 14px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+  .chart-card canvas { max-height: 240px; }
+
+  .table-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .table-controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .table-controls input, .table-controls select {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    background: var(--bg);
+  }
+  .table-controls input { flex: 1; min-width: 180px; }
+  .row-count { font-size: 12px; color: var(--muted); padding: 0 18px; margin: 10px 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; cursor: pointer; white-space: nowrap; }
+  th:hover { color: var(--text); }
+  th .arrow { opacity: 0.5; font-size: 10px; margin-left: 3px; }
+  tbody tr.customer-row { cursor: pointer; }
+  tbody tr.customer-row:hover { background: var(--bg); }
+  td.null-val { color: var(--muted); font-style: italic; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  .badge-active { background: #e3f2e8; color: var(--green); }
+  .badge-pending, .badge-endorsement_pending { background: #fbf1de; color: var(--amber); }
+  .badge-cancelled, .badge-claim_rejected, .badge-pending_cancellation { background: #f9e6e3; color: var(--red); }
+  .badge-inforce { background: #e3f2e8; color: var(--green); }
+  .badge-default { background: #ececea; color: var(--muted); }
+  .badge-carrier { background: var(--accent-soft); color: var(--accent); }
+
+  .detail-row td { background: #fbfbfa; padding: 0; }
+  .detail-wrap { padding: 16px 18px 20px 40px; }
+  .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 14px; }
+  .detail-block h4 { margin: 0 0 6px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .detail-block div { font-size: 13px; margin-bottom: 3px; }
+  .policies-table { margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .policies-table table { font-size: 12px; }
+  .policies-table th { background: var(--bg); }
+  .expand-icon { display: inline-block; width: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Carrier Data Dashboard</h1>
+    <div class="sub" id="headerSub">Loading…</div>
+  </div>
+  <div class="header-actions">
+    <button id="scrapeBtn" title="Run a live scrape of both carrier sites via POST /api/scrape">Run Scraper</button>
+    <button id="refreshBtn">Refresh</button>
+  </div>
+</header>
+
+<main>
+  <div id="loadingState">Loading scraped data…</div>
+
+  <div id="errorState" style="display:none;">
+    <p id="errorMessage"></p>
+    <p>Click <strong>Run Scraper</strong> above (or run <code>npm run scrape</code> in the project root), then click Refresh.</p>
+  </div>
+
+  <div id="content" style="display:none;">
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Policies by Status</h3>
+        <canvas id="statusChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Total Premium by Carrier</h3>
+        <canvas id="premiumChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Customers by Carrier</h3>
+        <canvas id="customerChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Credit Score Distribution</h3>
+        <canvas id="creditChart"></canvas>
+      </div>
+    </div>
+
+    <div class="table-section">
+      <div class="table-controls">
+        <input id="searchInput" type="text" placeholder="Search name, email, agent, agency…" />
+        <select id="carrierFilter"><option value="">All carriers</option></select>
+        <select id="statusFilter"><option value="">All policy statuses</option></select>
+      </div>
+      <div class="row-count" id="rowCount"></div>
+      <table>
+        <thead>
+          <tr>
+            <th data-key="carrier">Carrier <span class="arrow"></span></th>
+            <th data-key="name">Customer <span class="arrow"></span></th>
+            <th data-key="email">Email <span class="arrow"></span></th>
+            <th data-key="profession">Profession <span class="arrow"></span></th>
+            <th data-key="creditScore">Credit Score <span class="arrow"></span></th>
+            <th data-key="policyCount">Policies <span class="arrow"></span></th>
+            <th data-key="totalPremium">Total Premium <span class="arrow"></span></th>
+            <th data-key="agentName">Agent <span class="arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  const state = { records: [], rows: [], filtered: [], sortKey: 'name', sortDir: 1, expanded: new Set() };
+  const charts = {};
+
+  const fmtMoney = (n) => n == null ? '—' : '$' + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  // Scraped values are untrusted (they come from external websites) and get
+  // injected via innerHTML — always escape them to avoid stored XSS.
+  const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmtVal = (v) => (v === null || v === undefined || v === '') ? '<span class="null-val">—</span>' : esc(v);
+  const badgeClass = (status) => {
+    if (!status) return 'badge-default';
+    const s = String(status).toLowerCase().replace(/\s+/g, '_');
+    if (['active', 'inforce'].includes(s)) return 'badge-active';
+    if (s.includes('pending')) return 'badge-pending';
+    if (s.includes('cancel') || s.includes('reject')) return 'badge-cancelled';
+    return 'badge-default';
+  };
+
+  async function load() {
+    document.getElementById('loadingState').style.display = 'block';
+    document.getElementById('errorState').style.display = 'none';
+    document.getElementById('content').style.display = 'none';
+    try {
+      const res = await fetch('/api/scraped-data');
+      const body = await res.json();
+      if (!res.ok || !body.success) throw new Error(body.message || 'Failed to load data');
+      state.records = Array.isArray(body.data) ? body.data : [];
+      buildRows();
+      render();
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      const sourceLabel = body.source === 'database' ? 'PostgreSQL' : 'JSON file (DB unavailable)';
+      document.getElementById('headerSub').textContent =
+        `${state.records.length} customer record(s) · source: ${sourceLabel} · ${new Date().toLocaleString()}`;
+    } catch (err) {
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('errorState').style.display = 'block';
+      document.getElementById('errorMessage').textContent = err.message;
+    }
+  }
+
+  function buildRows() {
+    state.rows = state.records.map((r, i) => {
+      const policies = Array.isArray(r.policies) ? r.policies : [];
+      const totalPremium = policies.reduce((sum, p) => sum + (typeof p.premium === 'number' ? p.premium : 0), 0);
+      return {
+        _id: i,
+        carrier: r.carrier ?? null,
+        externalId: r.customer?.externalId ?? null,
+        name: r.customer?.name ?? null,
+        email: r.customer?.email ?? null,
+        address: r.customer?.address ?? null,
+        profession: r.customer?.profession ?? null,
+        creditScore: r.customer?.creditScore ?? null,
+        dateOfBirth: r.customer?.dateOfBirth ?? null,
+        ssn: r.customer?.ssn ?? null,
+        agentName: r.agent?.name ?? null,
+        agency: r.agent?.agency ?? null,
+        producerCode: r.agent?.producerCode ?? null,
+        policyCount: policies.length,
+        totalPremium,
+        policies,
+      };
+    });
+  }
+
+  function populateFilters() {
+    const carrierSel = document.getElementById('carrierFilter');
+    const statusSel = document.getElementById('statusFilter');
+    const carriers = [...new Set(state.rows.map((r) => r.carrier).filter(Boolean))].sort();
+    const statuses = [...new Set(state.rows.flatMap((r) => r.policies.map((p) => p.status)).filter(Boolean))].sort();
+
+    carrierSel.innerHTML = '<option value="">All carriers</option>' +
+      carriers.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    statusSel.innerHTML = '<option value="">All policy statuses</option>' +
+      statuses.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  }
+
+  function applyFilters() {
+    const q = document.getElementById('searchInput').value.trim().toLowerCase();
+    const carrier = document.getElementById('carrierFilter').value;
+    const status = document.getElementById('statusFilter').value;
+
+    state.filtered = state.rows.filter((r) => {
+      if (carrier && r.carrier !== carrier) return false;
+      if (status && !r.policies.some((p) => p.status === status)) return false;
+      if (q) {
+        const hay = [r.name, r.email, r.agentName, r.agency, r.profession].filter(Boolean).join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    state.filtered.sort((a, b) => {
+      const av = a[state.sortKey], bv = b[state.sortKey];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * state.sortDir;
+      return String(av).localeCompare(String(bv)) * state.sortDir;
+    });
+  }
+
+  function renderTable() {
+    applyFilters();
+    document.getElementById('rowCount').textContent = `${state.filtered.length} of ${state.rows.length} customers`;
+
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    state.filtered.forEach((r) => {
+      const tr = document.createElement('tr');
+      tr.className = 'customer-row';
+      tr.innerHTML = `
+        <td><span class="badge badge-carrier">${fmtVal(r.carrier)}</span></td>
+        <td><span class="expand-icon">${state.expanded.has(r._id) ? '▾' : '▸'}</span>${fmtVal(r.name)}</td>
+        <td>${fmtVal(r.email)}</td>
+        <td>${fmtVal(r.profession)}</td>
+        <td>${fmtVal(r.creditScore)}</td>
+        <td>${r.policyCount}</td>
+        <td>${fmtMoney(r.totalPremium)}</td>
+        <td>${fmtVal(r.agentName)}</td>
+      `;
+      tr.addEventListener('click', () => {
+        if (state.expanded.has(r._id)) state.expanded.delete(r._id);
+        else state.expanded.add(r._id);
+        renderTable();
+      });
+      tbody.appendChild(tr);
+
+      if (state.expanded.has(r._id)) {
+        const detailTr = document.createElement('tr');
+        detailTr.className = 'detail-row';
+        const td = document.createElement('td');
+        td.colSpan = 8;
+        td.innerHTML = renderDetail(r);
+        detailTr.appendChild(td);
+        tbody.appendChild(detailTr);
+      }
+    });
+
+    document.querySelectorAll('th[data-key]').forEach((th) => {
+      const arrow = th.querySelector('.arrow');
+      arrow.textContent = th.dataset.key === state.sortKey ? (state.sortDir === 1 ? '▲' : '▼') : '';
+    });
+  }
+
+  function renderDetail(r) {
+    const policyRows = r.policies.length
+      ? r.policies.map((p) => `
+          <tr>
+            <td>${fmtVal(p.id)}</td>
+            <td>${fmtVal(p.type)}</td>
+            <td><span class="badge ${badgeClass(p.status)}">${fmtVal(p.status)}</span></td>
+            <td>${p.premium == null ? '—' : fmtMoney(p.premium)}</td>
+            <td>${fmtVal(p.effectiveDate)}</td>
+            <td>${fmtVal(p.terminationDate)}</td>
+            <td>${fmtVal(p.underwriter?.name)}</td>
+          </tr>`).join('')
+      : `<tr><td colspan="7" class="null-val">No policies found</td></tr>`;
+
+    return `
+      <div class="detail-wrap">
+        <div class="detail-grid">
+          <div class="detail-block">
+            <h4>Customer</h4>
+            <div>ID: ${fmtVal(r.externalId)}</div>
+            <div>Address: ${fmtVal(r.address)}</div>
+            <div>DOB: ${fmtVal(r.dateOfBirth)}</div>
+            <div>SSN: ${fmtVal(r.ssn)}</div>
+          </div>
+          <div class="detail-block">
+            <h4>Agent</h4>
+            <div>Name: ${fmtVal(r.agentName)}</div>
+            <div>Producer Code: ${fmtVal(r.producerCode)}</div>
+            <div>Agency: ${fmtVal(r.agency)}</div>
+          </div>
+        </div>
+        <div class="policies-table">
+          <table>
+            <thead><tr><th>ID</th><th>Type</th><th>Status</th><th>Premium</th><th>Effective</th><th>Terminates</th><th>Underwriter</th></tr></thead>
+            <tbody>${policyRows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  function renderStats() {
+    const rows = state.rows;
+    const allPolicies = rows.flatMap((r) => r.policies);
+    const totalPremium = allPolicies.reduce((s, p) => s + (typeof p.premium === 'number' ? p.premium : 0), 0);
+    const scores = rows.map((r) => r.creditScore).filter((v) => typeof v === 'number');
+    const avgCredit = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+    const carriers = new Set(rows.map((r) => r.carrier).filter(Boolean));
+    const activeCount = allPolicies.filter((p) => badgeClass(p.status) === 'badge-active').length;
+
+    const stats = [
+      { label: 'Customers', value: rows.length },
+      { label: 'Carriers', value: carriers.size },
+      { label: 'Policies', value: allPolicies.length },
+      { label: 'Active Policies', value: allPolicies.length ? `${Math.round((activeCount / allPolicies.length) * 100)}%` : '—' },
+      { label: 'Total Premium', value: fmtMoney(totalPremium) },
+      { label: 'Avg Credit Score', value: avgCredit ?? '—' },
+    ];
+
+    document.getElementById('statsGrid').innerHTML = stats.map((s) => `
+      <div class="stat-card">
+        <div class="stat-value">${s.value}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>`).join('');
+  }
+
+  function groupCount(items, keyFn) {
+    const map = {};
+    items.forEach((item) => {
+      const k = keyFn(item) ?? 'Unknown';
+      map[k] = (map[k] || 0) + 1;
+    });
+    return map;
+  }
+
+  function makeChart(id, config) {
+    const ctx = document.getElementById(id).getContext('2d');
+    if (charts[id]) charts[id].destroy();
+    charts[id] = new Chart(ctx, config);
+  }
+
+  function renderCharts() {
+    const rows = state.rows;
+    const allPolicies = rows.flatMap((r) => r.policies.map((p) => ({ ...p, carrier: r.carrier })));
+
+    const palette = ['#c2542f', '#35638a', '#2f7a4f', '#b6842a', '#8a5ba0', '#b3392c'];
+
+    // Policies by status
+    const statusCounts = groupCount(allPolicies, (p) => p.status || 'unknown');
+    makeChart('statusChart', {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(statusCounts),
+        datasets: [{ data: Object.values(statusCounts), backgroundColor: palette }],
+      },
+      options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } } },
+    });
+
+    // Total premium by carrier
+    const premiumByCarrier = {};
+    allPolicies.forEach((p) => {
+      const c = p.carrier || 'unknown';
+      premiumByCarrier[c] = (premiumByCarrier[c] || 0) + (typeof p.premium === 'number' ? p.premium : 0);
+    });
+    makeChart('premiumChart', {
+      type: 'bar',
+      data: {
+        labels: Object.keys(premiumByCarrier),
+        datasets: [{ data: Object.values(premiumByCarrier), backgroundColor: '#c2542f', borderRadius: 6 }],
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+
+    // Customers by carrier
+    const customersByCarrier = groupCount(rows, (r) => r.carrier || 'unknown');
+    makeChart('customerChart', {
+      type: 'bar',
+      data: {
+        labels: Object.keys(customersByCarrier),
+        datasets: [{ data: Object.values(customersByCarrier), backgroundColor: '#35638a', borderRadius: 6 }],
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+
+    // Credit score distribution buckets
+    const buckets = { '<580': 0, '580-669': 0, '670-739': 0, '740-799': 0, '800+': 0, 'Unknown': 0 };
+    rows.forEach((r) => {
+      const s = r.creditScore;
+      if (typeof s !== 'number') buckets['Unknown']++;
+      else if (s < 580) buckets['<580']++;
+      else if (s < 670) buckets['580-669']++;
+      else if (s < 740) buckets['670-739']++;
+      else if (s < 800) buckets['740-799']++;
+      else buckets['800+']++;
+    });
+    makeChart('creditChart', {
+      type: 'bar',
+      data: {
+        labels: Object.keys(buckets),
+        datasets: [{ data: Object.values(buckets), backgroundColor: '#2f7a4f', borderRadius: 6 }],
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+    });
+  }
+
+  function render() {
+    populateFilters();
+    renderStats();
+    // Charts are progressive enhancement — if Chart.js failed to load,
+    // hide that section and keep the stats and table fully working.
+    try {
+      if (typeof Chart === 'undefined') throw new Error('Chart.js not loaded');
+      document.querySelector('.charts-grid').style.display = '';
+      renderCharts();
+    } catch (err) {
+      console.warn('Charts disabled:', err.message);
+      document.querySelector('.charts-grid').style.display = 'none';
+    }
+    renderTable();
+  }
+
+  document.getElementById('searchInput').addEventListener('input', renderTable);
+  document.getElementById('carrierFilter').addEventListener('change', renderTable);
+  document.getElementById('statusFilter').addEventListener('change', renderTable);
+  async function runScrape() {
+    const btn = document.getElementById('scrapeBtn');
+    const sub = document.getElementById('headerSub');
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = 'Scraping…';
+    sub.textContent = 'Live scrape running — this can take a minute or two…';
+    try {
+      const res = await fetch('/api/scrape', { method: 'POST' });
+      const body = await res.json();
+      if (!res.ok || !body.success) {
+        const detail = body.data?.errors?.[0]?.message;
+        throw new Error(body.message || detail || `Scrape failed (HTTP ${res.status})`);
+      }
+      await load();
+      if (body.data?.errorCount) {
+        sub.textContent += ` · last scrape had ${body.data.errorCount} error(s)`;
+      }
+    } catch (err) {
+      sub.textContent = `Scrape failed: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', load);
+  document.getElementById('scrapeBtn').addEventListener('click', runScrape);
+  document.querySelectorAll('th[data-key]').forEach((th) => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.key;
+      if (state.sortKey === key) state.sortDir *= -1;
+      else { state.sortKey = key; state.sortDir = 1; }
+      renderTable();
+    });
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

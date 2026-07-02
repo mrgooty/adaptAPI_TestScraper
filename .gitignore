@@ -1,0 +1,8 @@
+node_modules/
+.env
+.DS_Store
+# IDE folders (recreated automatically — never commit)
+.idea/
+.cursor/
+# Scraped dataset contains PII (SSNs, DOBs) — never commit it.
+output/

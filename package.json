@@ -1,0 +1,35 @@
+{
+  "name": "express-app",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:migrate:down": "node scripts/migrate.js down",
+    "db:migrate:status": "node scripts/migrate.js status",
+    "scrape": "node src/scrapers/index.js"
+  },
+  "keywords": ["scraper", "puppeteer", "express", "insurance", "postgres"],
+  "author": "Prashanth Gooty",
+  "license": "ISC",
+  "description": "Scrapes two insurance carrier websites into a normalized dataset (JSON + Postgres) served via a REST API, Swagger docs, and a dashboard",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@sequelize/core": "^7.0.0-alpha.48",
+    "@sequelize/postgres": "^7.0.0-alpha.48",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pg": "^8.22.0",
+    "puppeteer": "^25.2.1",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1",
+    "umzug": "^3.8.3"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/server-puppeteer": "^2025.5.12"
+  }
+}
