@@ -6,3 +6,5 @@ node_modules/
 .cursor/
 # Scraped dataset contains PII (SSNs, DOBs) — never commit it.
 output/
+.vercel
+.env*

@@ -28,6 +28,17 @@ const umzug = new Umzug({
 async function run() {
   const command = process.argv[2] || 'up';
 
+  // On Vercel this runs as the build step (see "vercel-build" in
+  // package.json) so the Neon tables exist before the first request.
+  // Fail fast with a clear message rather than a confusing ECONNREFUSED.
+  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+    console.error(
+      'Migration failed: DATABASE_URL is not set. Add it (plus DB_SSL=true) in ' +
+        'Vercel → Project → Settings → Environment Variables, then redeploy.'
+    );
+    process.exit(1);
+  }
+
   try {
     await sequelize.authenticate();
 

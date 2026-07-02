@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
+    "vercel-build": "node scripts/migrate.js",
     "db:migrate": "node scripts/migrate.js",
     "db:migrate:down": "node scripts/migrate.js down",
     "db:migrate:status": "node scripts/migrate.js status",

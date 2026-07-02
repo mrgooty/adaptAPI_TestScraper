@@ -163,7 +163,7 @@ The app is serverless-ready: `api/index.js` exports the Express app, `vercel.jso
 
 1. **Create a hosted Postgres** (e.g. [neon.tech](https://neon.tech), free tier) and copy its connection string.
 
-2. **Run migrations against it from your machine:**
+2. **Migrations run automatically on every deploy** — the `vercel-build` script executes `scripts/migrate.js` during the build, so a fresh Neon database gets all tables on the first deploy (and later deploys apply only what's pending). If you prefer running them manually:
 
    ```bash
    NODE_ENV=production DATABASE_URL='postgresql://user:pass@host/db?sslmode=require' npm run db:migrate
