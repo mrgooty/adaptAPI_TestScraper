@@ -32,8 +32,8 @@ module.exports = {
     password: process.env.DB_PASSWORD || undefined,
   },
   production: {
+    // Connection comes from DATABASE_URL (see config/database.js, which
+    // prefers that env var in every environment when it is set).
     ...shared,
-    // On most hosts (Heroku/Render/etc.) a single connection string is provided.
-    use_env_variable: 'DATABASE_URL',
   },
 };

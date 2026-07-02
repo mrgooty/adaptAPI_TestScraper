@@ -31,7 +31,9 @@ async function run() {
   // On Vercel this runs as the build step (see "vercel-build" in
   // package.json) so the Neon tables exist before the first request.
   // Fail fast with a clear message rather than a confusing ECONNREFUSED.
-  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+  // Keyed on VERCEL (always set in Vercel builds) rather than NODE_ENV,
+  // which Vercel does not guarantee during the build step.
+  if ((process.env.VERCEL || process.env.NODE_ENV === 'production') && !process.env.DATABASE_URL) {
     console.error(
       'Migration failed: DATABASE_URL is not set. Add it (plus DB_SSL=true) in ' +
         'Vercel → Project → Settings → Environment Variables, then redeploy.'
