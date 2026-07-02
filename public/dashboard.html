@@ -40,8 +40,8 @@
   }
   header h1 { font-size: 20px; margin: 0; font-weight: 600; }
   header .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
-  .header-actions { display: flex; gap: 8px; }
-  #refreshBtn, #scrapeBtn {
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+  #refreshBtn, #scrapeBtn, #apiDocsBtn {
     background: var(--accent);
     color: white;
     border: none;
@@ -50,9 +50,13 @@
     cursor: pointer;
     font-size: 13px;
     font-weight: 500;
+    text-decoration: none;
+    display: inline-block;
   }
   #scrapeBtn { background: var(--blue); }
+  #apiDocsBtn { background: var(--card); color: var(--text); border: 1px solid var(--border); }
   #refreshBtn:hover, #scrapeBtn:hover { opacity: 0.9; }
+  #apiDocsBtn:hover { background: var(--bg); }
   #refreshBtn:disabled, #scrapeBtn:disabled { opacity: 0.5; cursor: not-allowed; }
   main { padding: 24px 32px 60px; max-width: 1400px; margin: 0 auto; }
 
@@ -164,6 +168,7 @@
     <div class="sub" id="headerSub">Loading…</div>
   </div>
   <div class="header-actions">
+    <a id="apiDocsBtn" href="/api-docs" title="OpenAPI documentation for every endpoint">API Docs</a>
     <button id="scrapeBtn" title="Run a live scrape of both carrier sites via POST /api/scrape">Run Scraper</button>
     <button id="refreshBtn">Refresh</button>
   </div>
