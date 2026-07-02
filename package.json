@@ -20,10 +20,12 @@
   "dependencies": {
     "@sequelize/core": "^7.0.0-alpha.48",
     "@sequelize/postgres": "^7.0.0-alpha.48",
+    "@sparticuz/chromium": "^149.0.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "pg": "^8.22.0",
     "puppeteer": "^25.2.1",
+    "puppeteer-core": "^25.2.1",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
     "umzug": "^3.8.3"

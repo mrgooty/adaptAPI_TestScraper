@@ -9,7 +9,19 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// On serverless hosts the swagger-ui-dist static assets don't reliably make
+// it into the function bundle (blank /api-docs page), so point the UI at
+// CDN-hosted assets there. Locally everything is served from node_modules.
+const swaggerUiOptions = process.env.VERCEL
+  ? {
+      customCssUrl: 'https://unpkg.com/swagger-ui-dist@5/swagger-ui.css',
+      customJs: [
+        'https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js',
+        'https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js',
+      ],
+    }
+  : {};
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerUiOptions));
 app.get('/api-docs.json', (req, res) => res.json(swaggerSpec));
 
 app.get('/', (req, res) => {

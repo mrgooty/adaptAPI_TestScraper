@@ -9,16 +9,27 @@
  * duplicated across every carrier file.
  */
 
-// Puppeteer v23+ ships as an ES Module, so `require('puppeteer')` throws
-// ERR_REQUIRE_ESM on Node versions without require(esm) support (< 22.12).
-// Dynamic import() works from CommonJS on every Node version; cache the
-// promise so the module is only loaded once.
-let puppeteerPromise = null;
-function loadPuppeteer() {
-  if (!puppeteerPromise) {
-    puppeteerPromise = import('puppeteer').then((mod) => mod.default ?? mod);
+// Two launch environments:
+//   - Local/server (default): full `puppeteer` with its own downloaded Chrome.
+//   - Serverless (Vercel/AWS Lambda): no bundled Chrome fits the function
+//     size limit, so we use `puppeteer-core` + `@sparticuz/chromium`
+//     (a Lambda-compatible Chromium build).
+//
+// Both are loaded via dynamic import(): puppeteer v23+ ships as an ES Module,
+// so `require()` throws ERR_REQUIRE_ESM on Node < 22.12. The promise is
+// cached so each module loads once per process.
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+let launcherPromise = null;
+function loadLauncher() {
+  if (!launcherPromise) {
+    launcherPromise = IS_SERVERLESS
+      ? Promise.all([import('puppeteer-core'), import('@sparticuz/chromium')]).then(
+          ([pptr, chr]) => ({ puppeteer: pptr.default ?? pptr, chromium: chr.default ?? chr })
+        )
+      : import('puppeteer').then((mod) => ({ puppeteer: mod.default ?? mod, chromium: null }));
   }
-  return puppeteerPromise;
+  return launcherPromise;
 }
 
 const DEFAULT_OPTIONS = {
@@ -43,11 +54,19 @@ class BrowserManager {
 
   async launch() {
     if (this.browser) return this.browser;
-    const puppeteer = await loadPuppeteer();
-    this.browser = await puppeteer.launch({
-      headless: this.options.headless,
-      args: this.options.launchArgs,
-    });
+    const { puppeteer, chromium } = await loadLauncher();
+    this.browser = chromium
+      ? await puppeteer.launch({
+          // Serverless: chromium's own args include the sandbox/memory flags
+          // a locked-down function environment requires.
+          headless: true,
+          args: chromium.args,
+          executablePath: await chromium.executablePath(),
+        })
+      : await puppeteer.launch({
+          headless: this.options.headless,
+          args: this.options.launchArgs,
+        });
     return this.browser;
   }
 

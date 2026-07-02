@@ -1,0 +1,6 @@
+# Never upload scraped data (PII) or local-only files to Vercel
+output/
+.idea/
+.cursor/
+.env
+prompts.md

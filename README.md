@@ -157,6 +157,38 @@ output/scraped-data.json   # the normalized dataset (gitignored — contains PII
 
 ---
 
+## Deploying to Vercel
+
+The app is serverless-ready: `api/index.js` exports the Express app, `vercel.json` routes everything to it, and the scraper automatically switches to `puppeteer-core` + `@sparticuz/chromium` (a Lambda-sized Chromium) when it detects Vercel. Because serverless filesystems are ephemeral, **Postgres is the only data store in production** — use a hosted DB (Neon, Supabase, or Vercel Postgres).
+
+1. **Create a hosted Postgres** (e.g. [neon.tech](https://neon.tech), free tier) and copy its connection string.
+
+2. **Run migrations against it from your machine:**
+
+   ```bash
+   NODE_ENV=production DATABASE_URL='postgresql://user:pass@host/db?sslmode=require' npm run db:migrate
+   ```
+
+3. **Deploy:**
+
+   ```bash
+   npm i -g vercel
+   vercel                      # link the project, accept defaults
+   ```
+
+4. **Set environment variables** (Vercel dashboard → Project → Settings → Environment Variables, or `vercel env add`):
+
+   | Name | Value |
+   |---|---|
+   | `DATABASE_URL` | your hosted Postgres connection string |
+   | `DB_SSL` | `true` |
+
+   (`NODE_ENV=production` and `VERCEL=1` are set automatically.)
+
+5. **`vercel --prod`**, then open `/dashboard`, hit **Run Scraper**, and the data lands in your hosted DB.
+
+Caveats: scrapes run inside a function invocation (`maxDuration: 300` in `vercel.json` — lower it if your plan rejects it); the source site's cold start counts against that budget. The JSON-file fallback doesn't apply on Vercel — if the dashboard is empty, check `DATABASE_URL`.
+
 ## Troubleshooting
 
 | Symptom | Fix |

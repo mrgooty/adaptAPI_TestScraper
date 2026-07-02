@@ -38,10 +38,16 @@ async function runScrape(carrierSlug) {
     const totalFailure = records.length === 0 && errors.length > 0;
     let persistence = null;
     if (!totalFailure) {
-      fs.mkdirSync(path.dirname(DATA_PATH), { recursive: true });
-      fs.writeFileSync(DATA_PATH, JSON.stringify(records, null, 2));
-      // Best-effort: raw landing tables + normalized Agents/Customers/Policies.
-      // The JSON file above stays the API's source of truth if the DB is down.
+      // The JSON file is the DB-less fallback store. On serverless hosts
+      // (Vercel) the filesystem is read-only, so a failed write is fine —
+      // there, Postgres (below) is the only store that matters.
+      try {
+        fs.mkdirSync(path.dirname(DATA_PATH), { recursive: true });
+        fs.writeFileSync(DATA_PATH, JSON.stringify(records, null, 2));
+      } catch (err) {
+        console.warn(`Could not write ${DATA_PATH} (read-only filesystem?): ${err.message}`);
+      }
+      // Raw landing tables + normalized Agents/Customers/Policies.
       persistence = await persistScrape({ records, raws });
     }
 
